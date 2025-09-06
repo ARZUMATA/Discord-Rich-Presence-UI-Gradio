@@ -49,20 +49,21 @@ def update_storage_field(key, value):
 
 
 def add_to_history(field: str, value: str):
-    """Add value to history if not already present, trim to limit."""
-    if not value:
-        return
-    items = storage[f"{field}_history"]
+    """Add value to history if not blank, trim to limit."""
+    if not value or not value.strip():
+        return []
+    key = f"{field}_history"
+    items = storage[key]
     limit = storage["history_limit"]
     if value not in items:
         items.insert(0, value)
     else:
-        # Move to top if already exists
         items.remove(value)
         items.insert(0, value)
-    storage[f"{field}_history"] = items[:limit]
+    storage[key] = items[:limit]
     save_storage(storage)
-    return items[:limit]
+    return items[:limit]  # Return list for updating dropdown choices
+
 
 def connect_discord(client_id):
     global RPC, connected
@@ -86,7 +87,8 @@ def disconnect():
     RPC = None
     connected = False
     last_update_time = None
-    return "Disconnected.", "00:00:00", [], []
+    return "Disconnected.", "00:00:00"
+
 
 def total_seconds_to_hms(seconds):
     """Convert total seconds to (h, m, s)"""
@@ -114,7 +116,7 @@ def update_presence_auto(state, details,
         connect_discord(client_id_input)
 
     if not connected or RPC is None:
-        return "Not connected to Discord. Please check Client ID.", "00:00:00", [], []
+        return "Not connected to Discord. Please check Client ID.", "00:00:00"
 
     current_time = time.time()
     new_elapsed = 0
@@ -149,13 +151,9 @@ def update_presence_auto(state, details,
         # Save to history
         add_to_history("state", state)
         add_to_history("details", details)
-        state_choices = storage["state_history"]
-        details_choices = storage["details_history"]
         status_msg = "Presence updated!"
     except Exception as e:
         status_msg = f"Update failed: {e}"
-        state_choices = storage["state_history"]
-        details_choices = storage["details_history"]
 
     # Save auto mode state
     update_storage_field("auto_update_enabled", bool(enable_auto))
@@ -165,7 +163,7 @@ def update_presence_auto(state, details,
     display_time = f"{h:02d}:{m:02d}:{s:02d}"
 
     # Return updated elapsed to UI (preserved)
-    return status_msg, display_time, state_choices, details_choices
+    return status_msg, display_time
 
 
 def reset_timer():
@@ -173,11 +171,23 @@ def reset_timer():
     return 0, 0, 0, "00:00:00"
 
 
+def on_state_select(choice):
+    return choice  # Only called if choice is valid
+
+
+def on_details_select(choice):
+    return choice
+
+
 # Load initial choices
 state_choices = storage["state_history"]
 details_choices = storage["details_history"]
 
-with gr.Blocks(title="Discord Rich Presence") as demo:
+# Default values if empty
+initial_state = state_choices[0] if state_choices else "Doing something fun"
+initial_details = details_choices[0] if details_choices else "An important detail"
+
+with gr.Blocks(title="Discord Rich Presence UI") as demo:
     gr.Markdown("# Discord Rich Presence UI")
     gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
 
@@ -198,20 +208,36 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
     )
 
     gr.Markdown("## Presence Status")
-    state = gr.Dropdown(
-        label="State (type or select)",
+    
+    # State: Textbox + Dropdown
+    gr.Markdown("### State")
+    state = gr.Textbox(
+        label="Enter State",
+        value=initial_state,
+        placeholder="e.g., Playing a game"
+    )
+    state_dropdown = gr.Dropdown(
+        label="Recent States (click to load)",
         choices=state_choices,
-        value="Doing something fun",
-        filterable=True,
-        elem_id="state_dd"
+        interactive=True,
+        allow_custom_value=False
     )
-    details = gr.Dropdown(
-        label="Details (type or select)",
+    state_dropdown.change(fn=on_state_select, inputs=state_dropdown, outputs=state)
+
+    # Details
+    gr.Markdown("### Details")
+    details = gr.Textbox(
+        label="Enter Details",
+        value=initial_details,
+        placeholder="e.g., On level 10"
+    )
+    details_dropdown = gr.Dropdown(
+        label="Recent Details (click to load)",
         choices=details_choices,
-        value="An important detail",
-        filterable=True,
-        elem_id="details_dd"
+        interactive=True,
+        allow_custom_value=False
     )
+    details_dropdown.change(fn=on_details_select, inputs=details_dropdown, outputs=details)
 
     gr.Markdown("## Elapsed Time (HH:MM:SS)")
     with gr.Row():
@@ -246,10 +272,10 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
 
     # Connect events
     connect_btn.click(fn=connect_discord, inputs=client_id, outputs=status)
-    disconnect_btn.click(fn=disconnect, outputs=[status, current_elapsed_display, state, details])
+    disconnect_btn.click(fn=disconnect, outputs=[status, current_elapsed_display])
 
     # Update presence
-    update_btn.click(
+    result = update_btn.click(
         fn=update_presence_auto,
         inputs=[
             state, details,
@@ -257,7 +283,18 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
             large_image, large_text, small_image, small_text,
             enable_auto, update_interval, client_id
         ],
-        outputs=[status, current_elapsed_display, state, details]
+        outputs=[status, current_elapsed_display]
+    )
+
+    # After update, refresh dropdown choices (not values!)
+    result.then(
+        fn=lambda: gr.update(choices=storage["state_history"]),
+        inputs=None,
+        outputs=state_dropdown
+    ).then(
+        fn=lambda: gr.update(choices=storage["details_history"]),
+        inputs=None,
+        outputs=details_dropdown
     ).then(
         # Sync back current elapsed to HH:MM:SS inputs
         fn=lambda display: [
