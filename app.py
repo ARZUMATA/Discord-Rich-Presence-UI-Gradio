@@ -86,10 +86,24 @@ def disconnect():
     RPC = None
     connected = False
     last_update_time = None
-    return "Disconnected.", 0, [], []
+    return "Disconnected.", "00:00:00", [], []
+
+def total_seconds_to_hms(seconds):
+    """Convert total seconds to (h, m, s)"""
+    seconds = int(max(seconds, 0))
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return h, m, s
 
 
-def update_presence_auto(state, details, start, large_image, large_text, small_image, small_text,
+def hms_to_total_seconds(h, m, s):
+    """Convert h, m, s to total seconds"""
+    return h * 3600 + m * 60 + s
+
+def update_presence_auto(state, details,
+                         hours, minutes, seconds,  # HH MM SS inputs
+                         large_image, large_text, small_image, small_text,
                          enable_auto, update_interval, client_id_input):
     global RPC, connected, last_update_time, manual_start_offset
 
@@ -100,7 +114,7 @@ def update_presence_auto(state, details, start, large_image, large_text, small_i
         connect_discord(client_id_input)
 
     if not connected or RPC is None:
-        return "Not connected to Discord. Please check Client ID.", start, [], []
+        return "Not connected to Discord. Please check Client ID.", "00:00:00", [], []
 
     current_time = time.time()
     new_elapsed = 0
@@ -116,7 +130,7 @@ def update_presence_auto(state, details, start, large_image, large_text, small_i
         new_elapsed = manual_start_offset + elapsed_since_update
     else:
         # First update ever: use user input
-        new_elapsed = float(start) if start else 0
+        new_elapsed = hms_to_total_seconds(hours, minutes, seconds)
 
     # Update internal tracker
     manual_start_offset = new_elapsed
@@ -146,8 +160,18 @@ def update_presence_auto(state, details, start, large_image, large_text, small_i
     # Save auto mode state
     update_storage_field("auto_update_enabled", bool(enable_auto))
 
+    # Format current elapsed time as HH:MM:SS string for display
+    h, m, s = total_seconds_to_hms(new_elapsed)
+    display_time = f"{h:02d}:{m:02d}:{s:02d}"
+
     # Return updated elapsed to UI (preserved)
-    return status_msg, new_elapsed, state_choices, details_choices
+    return status_msg, display_time, state_choices, details_choices
+
+
+def reset_timer():
+    """Reset the timer to 00:00:00"""
+    return 0, 0, 0, "00:00:00"
+
 
 # Load initial choices
 state_choices = storage["state_history"]
@@ -167,9 +191,9 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
         disconnect_btn = gr.Button("Disconnect")
 
     status = gr.Textbox(label="Status", value="Not connected")
-    current_elapsed = gr.Number(
+    current_elapsed_display = gr.Textbox(
         label="Current Elapsed Time (auto-updated)",
-        value=0,
+        value="00:00:00",
         interactive=False  # Display-only
     )
 
@@ -189,7 +213,13 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
         elem_id="details_dd"
     )
 
-    start = gr.Number(label="Initial Elapsed Time (seconds)", value=5)
+    gr.Markdown("## Elapsed Time (HH:MM:SS)")
+    with gr.Row():
+        hours = gr.Number(label="Hours", value=0, precision=0, minimum=0)
+        minutes = gr.Number(label="Minutes", value=0, precision=0, minimum=0)
+        seconds = gr.Number(label="Seconds", value=5, precision=0, minimum=0)
+
+    reset_btn = gr.Button("Reset Timer to 00:00:00", variant="secondary")
 
     gr.Markdown("## Art Assets (must be uploaded to Discord first)")
     with gr.Row():
@@ -216,22 +246,35 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
 
     # Connect events
     connect_btn.click(fn=connect_discord, inputs=client_id, outputs=status)
-    disconnect_btn.click(fn=disconnect, outputs=[status, current_elapsed, state, details])
+    disconnect_btn.click(fn=disconnect, outputs=[status, current_elapsed_display, state, details])
 
-    # On update: preserve elapsed, update display, reflect in start field
+    # Update presence
     update_btn.click(
         fn=update_presence_auto,
         inputs=[
-            state, details, start, large_image, large_text,
-            small_image, small_text, enable_auto, update_interval, client_id
+            state, details,
+            hours, minutes, seconds,
+            large_image, large_text, small_image, small_text,
+            enable_auto, update_interval, client_id
         ],
-        outputs=[status, current_elapsed, state, details]
+        outputs=[status, current_elapsed_display, state, details]
     ).then(
-        fn=lambda x: gr.update(value=x),  # Sync current elapsed → Initial Elapsed Time
-        inputs=current_elapsed,
-        outputs=start
+        # Sync back current elapsed to HH:MM:SS inputs
+        fn=lambda display: [
+            gr.update(value=int(display.split(':')[0])),
+            gr.update(value=int(display.split(':')[1])),
+            gr.update(value=int(display.split(':')[2]))
+        ],
+        inputs=current_elapsed_display,
+        outputs=[hours, minutes, seconds]
     )
 
-    # Auto-refresh
+    # Reset timer to 0
+    reset_btn.click(
+        fn=reset_timer,
+        inputs=None,
+        outputs=[hours, minutes, seconds, current_elapsed_display]
+    )
+
     demo.queue()
     demo.launch()
