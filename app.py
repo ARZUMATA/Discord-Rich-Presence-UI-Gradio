@@ -197,8 +197,39 @@ with gr.Blocks(
     }
     """
 ) as demo:
+    with gr.Row():
+        with gr.Column():
     gr.Markdown("# Discord Rich Presence UI")
     gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
+
+        with gr.Column(scale=1):
+            # Avatar with decoration and links
+            avatar_html = '''
+            <div style="display: flex; justify-content: flex-end; align-items: center; height: 100%;">
+                <div style="position: relative; display: inline-block; margin-right: 10px;" title="ARZUMATA">
+                    <img src="https://avatars.githubusercontent.com/u/54457203?v=4" 
+                            alt="Avatar" 
+                            style="border-radius: 50%; width: 64px; height: 64px;">
+                    <img src="https://image.civitai.com/xG1nkqKTMzGDvpLrqFT7WA/50a92b90-66fd-44ed-926a-5f936e7078a1/original=true/user%20avatar%20decoration.gif" 
+                            alt="Avatar Decoration" 
+                            style="position: absolute; top: 0px; scale: 120%">
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <a href="https://github.com/ARZUMATA" target="_blank" style="text-decoration: none; font-size: 18px;">
+                        <svg width="32" height="32" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                        </svg>
+                    </a>
+                    <a href="https://civitai.com/user/ARZUMATA" target="_blank" style="text-decoration: none;">
+                        <img src="https://civitai.com/favicon.ico" alt="Civitai" style="width: 32px; height: 32px;">
+                    </a>
+                    <a href="https://huggingface.co/ARZUMATA" target="_blank" style="text-decoration: none;">
+                        <img src="https://huggingface.co/favicon.ico" alt="Hugging Face" style="width: 32px; height: 32px;">
+                    </a>
+                </div>
+            </div>
+            '''
+            gr.HTML(avatar_html)
 
     with gr.Row():
         with gr.Column():
