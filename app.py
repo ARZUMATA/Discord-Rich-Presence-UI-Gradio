@@ -187,7 +187,16 @@ details_choices = storage["details_history"]
 initial_state = state_choices[0] if state_choices else "Doing something fun"
 initial_details = details_choices[0] if details_choices else "An important detail"
 
-with gr.Blocks(title="Discord Rich Presence UI") as demo:
+with gr.Blocks(
+    title="Discord Rich Presence UI",
+    css="""
+    .gradio-container {
+        max-width: 800px !important;
+        margin: 0 auto !important;
+        padding: 20px;
+    }
+    """
+) as demo:
     gr.Markdown("# Discord Rich Presence UI")
     gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
 
@@ -197,47 +206,61 @@ with gr.Blocks(title="Discord Rich Presence UI") as demo:
             value=storage.get("client_id", ""),
             placeholder="1234567890"
         )
-        connect_btn = gr.Button("Connect")
-        disconnect_btn = gr.Button("Disconnect")
+        with gr.Column():
+            connect_btn = gr.Button("Connect")
+            disconnect_btn = gr.Button("Disconnect")
 
-    status = gr.Textbox(label="Status", value="Not connected")
-    current_elapsed_display = gr.Textbox(
-        label="Current Elapsed Time (auto-updated)",
-        value="00:00:00",
-        interactive=False  # Display-only
-    )
+    with gr.Row():
+        status = gr.Textbox(label="Status", value="Not connected")
+        current_elapsed_display = gr.Textbox(
+            label="Current Elapsed Time (auto-updated)",
+            value="00:00:00",
+            interactive=False  # Display-only
+        )
 
     gr.Markdown("## Presence Status")
     
-    # State: Textbox + Dropdown
-    gr.Markdown("### State")
-    state = gr.Textbox(
-        label="Enter State",
-        value=initial_state,
-        placeholder="e.g., Playing a game"
-    )
-    state_dropdown = gr.Dropdown(
-        label="Recent States (click to load)",
-        choices=state_choices,
-        interactive=True,
-        allow_custom_value=False
-    )
-    state_dropdown.change(fn=on_state_select, inputs=state_dropdown, outputs=state)
+    with gr.Row():
+        # State: Textbox + Dropdown
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### State")
+            with gr.Column():
+                state = gr.Textbox(
+                    label="Enter State",
+                    value=initial_state,
+                    placeholder="e.g., Playing a game"
+                )
+            with gr.Column():
+                state_dropdown = gr.Dropdown(
+                    label="Recent States (click to load)",
+                    choices=state_choices,
+                    interactive=True,
+                    allow_custom_value=False
+                )
+                state_dropdown.change(fn=on_state_select, inputs=state_dropdown, outputs=state)
 
-    # Details
-    gr.Markdown("### Details")
-    details = gr.Textbox(
-        label="Enter Details",
-        value=initial_details,
-        placeholder="e.g., On level 10"
-    )
-    details_dropdown = gr.Dropdown(
-        label="Recent Details (click to load)",
-        choices=details_choices,
-        interactive=True,
-        allow_custom_value=False
-    )
-    details_dropdown.change(fn=on_details_select, inputs=details_dropdown, outputs=details)
+        # Details
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### Details")
+            with gr.Column():
+
+                details = gr.Textbox(
+                    label="Enter Details",
+                    value=initial_details,
+                    placeholder="e.g., On level 10"
+                )
+            with gr.Column():
+                details_dropdown = gr.Dropdown(
+                    label="Recent Details (click to load)",
+                    choices=details_choices,
+                    interactive=True,
+                    allow_custom_value=False
+                )
+                details_dropdown.change(fn=on_details_select, inputs=details_dropdown, outputs=details)
+
+    update_btn = gr.Button("Update Presence")
 
     gr.Markdown("## Elapsed Time (HH:MM:SS)")
     with gr.Row():
@@ -249,12 +272,15 @@ with gr.Blocks(title="Discord Rich Presence UI") as demo:
 
     gr.Markdown("## Art Assets (must be uploaded to Discord first)")
     with gr.Row():
-        large_image = gr.Textbox(label="Large Image Key", placeholder="e.g., play_icon")
-        large_text = gr.Textbox(label="Large Image Text", placeholder="Hover text for large image")
+        with gr.Row():
+            with gr.Column():
+                large_image = gr.Textbox(label="Large Image Key", placeholder="e.g., play_icon")
+                large_text = gr.Textbox(label="Large Image Text", placeholder="Hover text for large image")
 
-    with gr.Row():
-        small_image = gr.Textbox(label="Small Image Key", placeholder="e.g., logo")
-        small_text = gr.Textbox(label="Small Image Text", placeholder="Hover text for small image")
+        with gr.Row():
+            with gr.Column():
+                small_image = gr.Textbox(label="Small Image Key", placeholder="e.g., logo")
+                small_text = gr.Textbox(label="Small Image Text", placeholder="Hover text for small image")
 
     gr.Markdown("## Auto-Update Settings")
     enable_auto = gr.Checkbox(
@@ -268,7 +294,6 @@ with gr.Blocks(title="Discord Rich Presence UI") as demo:
     update_interval.change(lambda x: update_storage_field("update_interval", x), inputs=update_interval)
     enable_auto.change(lambda x: update_storage_field("auto_update_enabled", x), inputs=enable_auto)
 
-    update_btn = gr.Button("Update Presence")
 
     # Connect events
     connect_btn.click(fn=connect_discord, inputs=client_id, outputs=status)
@@ -314,4 +339,7 @@ with gr.Blocks(title="Discord Rich Presence UI") as demo:
     )
 
     demo.queue()
-    demo.launch()
+    demo.launch(
+    share=False,
+    debug=True,
+)
