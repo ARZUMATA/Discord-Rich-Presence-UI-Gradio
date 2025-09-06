@@ -201,11 +201,14 @@ with gr.Blocks(
     gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
 
     with gr.Row():
-        client_id = gr.Textbox(
-            label="Client ID",
-            value=storage.get("client_id", ""),
-            placeholder="1234567890"
-        )
+        with gr.Column():
+            show_id = gr.Checkbox(label="Show Client ID", value=False)
+            client_id = gr.Textbox(
+                label="Client ID",
+                value=storage.get("client_id", ""),
+                type="password",
+                placeholder="1234567890"
+            )
         with gr.Column():
             connect_btn = gr.Button("Connect")
             disconnect_btn = gr.Button("Disconnect")
@@ -217,7 +220,13 @@ with gr.Blocks(
             value="00:00:00",
             interactive=False  # Display-only
         )
-
+        
+    show_id.change(
+            lambda show: gr.update(type="text" if show else "password"),
+            inputs=show_id,
+            outputs=client_id
+        )
+    
     gr.Markdown("## Presence Status")
     
     with gr.Row():
@@ -271,16 +280,17 @@ with gr.Blocks(
     reset_btn = gr.Button("Reset Timer to 00:00:00", variant="secondary")
 
     gr.Markdown("## Art Assets (must be uploaded to Discord first)")
-    with gr.Row():
+    with gr.Accordion("Show/Hide Image & Text Settings", open=False):
         with gr.Row():
-            with gr.Column():
-                large_image = gr.Textbox(label="Large Image Key", placeholder="e.g., play_icon")
-                large_text = gr.Textbox(label="Large Image Text", placeholder="Hover text for large image")
+            with gr.Row():
+                with gr.Column():
+                    large_image = gr.Textbox(label="Large Image Key", placeholder="e.g., play_icon")
+                    large_text = gr.Textbox(label="Large Image Text", placeholder="Hover text for large image")
 
-        with gr.Row():
-            with gr.Column():
-                small_image = gr.Textbox(label="Small Image Key", placeholder="e.g., logo")
-                small_text = gr.Textbox(label="Small Image Text", placeholder="Hover text for small image")
+            with gr.Row():
+                with gr.Column():
+                    small_image = gr.Textbox(label="Small Image Key", placeholder="e.g., logo")
+                    small_text = gr.Textbox(label="Small Image Text", placeholder="Hover text for small image")
 
     gr.Markdown("## Auto-Update Settings")
     enable_auto = gr.Checkbox(
