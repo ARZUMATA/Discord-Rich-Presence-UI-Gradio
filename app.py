@@ -121,18 +121,29 @@ def update_presence_auto(state, details,
     current_time = time.time()
     new_elapsed = 0
 
-    # Preserve current elapsed time or resume auto
-    if enable_auto and last_update_time is not None:
-        # Continue auto-updating from previous elapsed
-        elapsed_since_update = current_time - last_update_time
-        new_elapsed = manual_start_offset + elapsed_since_update
-    elif last_update_time is not None:
-        # Manual update: keep last computed elapsed (don't reset)
-        elapsed_since_update = current_time - last_update_time
-        new_elapsed = manual_start_offset + elapsed_since_update
+    # Compute what the current UI input is (in seconds)
+    ui_elapsed = hms_to_total_seconds(hours, minutes, seconds)
+
+    # If we already have a running timer, use it unless UI inputs were manually changed
+    if last_update_time is not None:
+        if enable_auto:
+            # Continue auto-updating from last known elapsed
+            elapsed_since_update = current_time - last_update_time
+            new_elapsed = manual_start_offset + elapsed_since_update
+        else:
+            # Manual mode: still continue from last elapsed (don't reset!)
+            # But: check if user manually changed the HH:MM:SS fields
+            current_h, current_m, current_s = total_seconds_to_hms(manual_start_offset)
+            # If UI does NOT match current internal elapsed → user changed it
+            if not (abs(ui_elapsed - manual_start_offset) < 1):  # Allow 1s tolerance
+                new_elapsed = ui_elapsed  # Accept manual override
+            else:
+                # No change in UI → keep accumulating
+                elapsed_since_update = current_time - last_update_time
+                new_elapsed = manual_start_offset + elapsed_since_update
     else:
-        # First update ever: use user input
-        new_elapsed = hms_to_total_seconds(hours, minutes, seconds)
+        # First update ever: use UI input
+        new_elapsed = ui_elapsed
 
     # Update internal tracker
     manual_start_offset = new_elapsed
@@ -162,12 +173,13 @@ def update_presence_auto(state, details,
     h, m, s = total_seconds_to_hms(new_elapsed)
     display_time = f"{h:02d}:{m:02d}:{s:02d}"
 
-    # Return updated elapsed to UI (preserved)
     return status_msg, display_time
-
 
 def reset_timer():
     """Reset the timer to 00:00:00"""
+    global manual_start_offset, last_update_time
+    manual_start_offset = 0
+    last_update_time = time.time()  # So next update starts from 0
     return 0, 0, 0, "00:00:00"
 
 
@@ -199,8 +211,8 @@ with gr.Blocks(
 ) as demo:
     with gr.Row():
         with gr.Column():
-    gr.Markdown("# Discord Rich Presence UI")
-    gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
+            gr.Markdown("# Discord Rich Presence UI")
+            gr.Markdown("Set your custom presence with optional auto-updating elapsed time.")
 
         with gr.Column(scale=1):
             # Avatar with decoration and links
@@ -257,7 +269,7 @@ with gr.Blocks(
             inputs=show_id,
             outputs=client_id
         )
-    
+
     gr.Markdown("## Presence Status")
     
     with gr.Row():
@@ -309,6 +321,25 @@ with gr.Blocks(
         seconds = gr.Number(label="Seconds", value=5, precision=0, minimum=0)
 
     reset_btn = gr.Button("Reset Timer to 00:00:00", variant="secondary")
+
+    # Detect if the user edits HH:MM:SS without clicking Update
+    def on_time_edit(h, m, s):
+        global manual_start_offset, last_update_time
+        total = hms_to_total_seconds(h, m, s)
+        # Update internal state so next "Update" uses this as base
+        manual_start_offset = total
+        last_update_time = time.time()
+        display = f"{int(h):02d}:{int(m):02d}:{int(s):02d}"
+        return display  # Update display field
+
+    # Sync whenever time fields change
+    # Register event for all three inputs
+    gr.on(
+        triggers=[hours.change, minutes.change, seconds.change],
+        fn=on_time_edit,
+        inputs=[hours, minutes, seconds],
+        outputs=current_elapsed_display
+    )
 
     gr.Markdown("## Art Assets (must be uploaded to Discord first)")
     with gr.Accordion("Show/Hide Image & Text Settings", open=False):
