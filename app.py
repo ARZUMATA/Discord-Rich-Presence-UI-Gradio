@@ -13,7 +13,8 @@ DEFAULT_STORAGE = {
     "state_history": [],
     "details_history": [],
     "update_interval": 300,  # Default update interval in seconds
-    "history_limit": 10
+    "history_limit": 10,
+    "auto_update_enabled": False
 }
 
 # Load or initialize storage
@@ -85,7 +86,7 @@ def disconnect():
     RPC = None
     connected = False
     last_update_time = None
-    return "Disconnected.", [], []
+    return "Disconnected.", 0, [], []
 
 
 def update_presence_auto(state, details, start, large_image, large_text, small_image, small_text,
@@ -102,14 +103,24 @@ def update_presence_auto(state, details, start, large_image, large_text, small_i
         return "Not connected to Discord. Please check Client ID.", start, [], []
 
     current_time = time.time()
-    # Compute elapsed time
+    new_elapsed = 0
+
+    # Preserve current elapsed time or resume auto
     if enable_auto and last_update_time is not None:
+        # Continue auto-updating from previous elapsed
+        elapsed_since_update = current_time - last_update_time
+        new_elapsed = manual_start_offset + elapsed_since_update
+    elif last_update_time is not None:
+        # Manual update: keep last computed elapsed (don't reset)
         elapsed_since_update = current_time - last_update_time
         new_elapsed = manual_start_offset + elapsed_since_update
     else:
+        # First update ever: use user input
         new_elapsed = float(start) if start else 0
-        manual_start_offset = new_elapsed
-        last_update_time = current_time
+
+    # Update internal tracker
+    manual_start_offset = new_elapsed
+    last_update_time = current_time
 
     try:
         RPC.update(
@@ -132,6 +143,10 @@ def update_presence_auto(state, details, start, large_image, large_text, small_i
         state_choices = storage["state_history"]
         details_choices = storage["details_history"]
 
+    # Save auto mode state
+    update_storage_field("auto_update_enabled", bool(enable_auto))
+
+    # Return updated elapsed to UI (preserved)
     return status_msg, new_elapsed, state_choices, details_choices
 
 # Load initial choices
@@ -155,7 +170,7 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
     current_elapsed = gr.Number(
         label="Current Elapsed Time (auto-updated)",
         value=0,
-        interactive=False  # Display-only, user cannot edit
+        interactive=False  # Display-only
     )
 
     gr.Markdown("## Presence Status")
@@ -163,13 +178,15 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
         label="State (type or select)",
         choices=state_choices,
         value="Doing something fun",
-        allow_custom_value=True
+        filterable=True,
+        elem_id="state_dd"
     )
     details = gr.Dropdown(
         label="Details (type or select)",
         choices=details_choices,
         value="An important detail",
-        allow_custom_value=True
+        filterable=True,
+        elem_id="details_dd"
     )
 
     start = gr.Number(label="Initial Elapsed Time (seconds)", value=5)
@@ -184,19 +201,24 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
         small_text = gr.Textbox(label="Small Image Text", placeholder="Hover text for small image")
 
     gr.Markdown("## Auto-Update Settings")
-    enable_auto = gr.Checkbox(label="Enable Auto-Update Elapsed Time", value=False)
+    enable_auto = gr.Checkbox(
+        label="Enable Auto-Update Elapsed Time",
+        value=storage.get("auto_update_enabled", False)
+    )
     update_interval = gr.Slider(
         minimum=0.5, maximum=10, value=storage.get("update_interval", 300), step=0.5,
         label="Update Interval (seconds)"
     )
     update_interval.change(lambda x: update_storage_field("update_interval", x), inputs=update_interval)
+    enable_auto.change(lambda x: update_storage_field("auto_update_enabled", x), inputs=enable_auto)
 
     update_btn = gr.Button("Update Presence")
 
     # Connect events
     connect_btn.click(fn=connect_discord, inputs=client_id, outputs=status)
-    disconnect_btn.click(fn=disconnect, outputs=[status, state, details])
+    disconnect_btn.click(fn=disconnect, outputs=[status, current_elapsed, state, details])
 
+    # On update: preserve elapsed, update display, reflect in start field
     update_btn.click(
         fn=update_presence_auto,
         inputs=[
@@ -204,6 +226,10 @@ with gr.Blocks(title="Discord Rich Presence") as demo:
             small_image, small_text, enable_auto, update_interval, client_id
         ],
         outputs=[status, current_elapsed, state, details]
+    ).then(
+        fn=lambda x: gr.update(value=x),  # Sync current elapsed → Initial Elapsed Time
+        inputs=current_elapsed,
+        outputs=start
     )
 
     # Auto-refresh
