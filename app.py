@@ -273,29 +273,11 @@ with gr.Blocks(
     gr.Markdown("## Presence Status")
     
     with gr.Row():
-        # State: Textbox + Dropdown
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("### State")
-            with gr.Column():
-                state = gr.Textbox(
-                    label="Enter State",
-                    value=initial_state,
-                    placeholder="e.g., Playing a game"
-                )
-            with gr.Column():
-                state_dropdown = gr.Dropdown(
-                    label="Recent States (click to load)",
-                    choices=state_choices,
-                    interactive=True,
-                    allow_custom_value=False
-                )
-                state_dropdown.change(fn=on_state_select, inputs=state_dropdown, outputs=state)
 
         # Details
         with gr.Row():
             with gr.Column():
-                gr.Markdown("### Details")
+                gr.Markdown("### Details (first row)")
             with gr.Column():
 
                 details = gr.Textbox(
@@ -311,6 +293,25 @@ with gr.Blocks(
                     allow_custom_value=False
                 )
                 details_dropdown.change(fn=on_details_select, inputs=details_dropdown, outputs=details)
+                
+        # State: Textbox + Dropdown
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("### State (second row)")
+            with gr.Column():
+                state = gr.Textbox(
+                    label="Enter State",
+                    value=initial_state,
+                    placeholder="e.g., Playing a game"
+                )
+            with gr.Column():
+                state_dropdown = gr.Dropdown(
+                    label="Recent States (click to load)",
+                    choices=state_choices,
+                    interactive=True,
+                    allow_custom_value=False
+                )
+                state_dropdown.change(fn=on_state_select, inputs=state_dropdown, outputs=state)
 
     update_btn = gr.Button("Update Presence")
 
