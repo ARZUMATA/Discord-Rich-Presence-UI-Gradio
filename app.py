@@ -153,6 +153,7 @@ def update_presence_auto(state, details,
         RPC.update(
             state=state,
             details=details,
+            # party_size=[0,0],
             start=int(current_time - new_elapsed),
             large_image=large_image or None,
             large_text=large_text or None,
@@ -415,4 +416,6 @@ with gr.Blocks(
     demo.launch(
     share=False,
     debug=True,
+    server_port=7870,
+    inbrowser=True,
 )
